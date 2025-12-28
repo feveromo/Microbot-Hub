@@ -70,30 +70,43 @@ configurations {
                 substitute module("com.microbot:client") using module("com.microbot:microbot:${microbotClientVersion}")
             }
             eachDependency { details ->
-                // Removed specific artifact selection for com.microbot:client as it may interfere with metadata parsing
+                if (details.target.group == 'com.microbot' && details.target.name == 'microbot') {
+                    details.artifactSelection {
+                        selectArtifact(DependencyArtifact.DEFAULT_TYPE, null, null)
+                    }
+                }
             }
         }
     }
 }
 
 repositories {
-    maven {
-        url = project.ext.getNexusNightlyUrl()
-    }
-    maven {
-        url = "https://repo.runelite.net/"
-        content {
-            excludeGroup "com.microbot"
+    ivy {
+        name = "microbot-client-github-releases"
+        url = uri(project.ext.getGithubClientBaseUrl())
+        patternLayout {
+            artifact "[revision]/[module]-[revision].[ext]"
+            artifact "[revision]/microbot-[revision].[ext]"
         }
+        metadataSources { artifact() }
     }
     mavenCentral()
 }
 
 dependencies {
-    compileOnly 'com.microbot:client:2.0.60'
-    microbotRuntime 'com.microbot:client:2.0.60'
-
-    testImplementation 'com.microbot:client:2.0.60'
+    if (microbotClientPath) {
+        def clientFile = file(microbotClientPath)
+        if (!clientFile.exists()) {
+            throw new GradleException("microbotClientPath does not exist: ${clientFile}")
+        }
+        compileOnly files(clientFile)
+        microbotRuntime files(clientFile)
+        testImplementation files(clientFile)
+    } else {
+        compileOnly "com.microbot:microbot:${microbotClientVersion}@jar"
+        microbotRuntime "com.microbot:microbot:${microbotClientVersion}@jar"
+        testImplementation "com.microbot:microbot:${microbotClientVersion}@jar"
+    }
 }
 
 application {

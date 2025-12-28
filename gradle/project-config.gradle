@@ -36,6 +36,7 @@ project.ext.getDocsOutputPath = { -> project.ext.DOCS_OUTPUT_PATH }
 project.ext.getGithubClientBaseUrl = { -> project.ext.GITHUB_CLIENT_RELEASE_BASE_URL }
 project.ext.getGithubPluginsBaseUrl = { -> project.ext.GITHUB_PLUGINS_RELEASE_BASE_URL }
 project.ext.getGithubPluginsReleaseTag = { -> project.findProperty("pluginsReleaseTag") ?: project.ext.GITHUB_PLUGINS_RELEASE_TAG }
+project.ext.getNexusNightlyUrl = { -> "https://maven.microbot.cloud/repository/maven-nightly/" }
 project.ext.fetchLatestMicrobotClientVersion = {
     if (project.gradle.startParameter.offline) {
         project.logger.warn("⚠️ Offline mode: cannot fetch latest microbot client version; falling back to default ${project.ext.MICROBOT_CLIENT_VERSION}")
