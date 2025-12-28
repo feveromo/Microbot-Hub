@@ -1,5 +1,3 @@
-___
-
 # Microbot Hub
 
 Welcome to the Microbot Hub.

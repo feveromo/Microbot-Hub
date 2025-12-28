@@ -14,6 +14,7 @@ import net.runelite.client.ui.overlay.components.TitleComponent;
 
 import javax.inject.Inject;
 import java.awt.*;
+
 @Slf4j
 public class AIOFighterInfoOverlay extends OverlayPanel {
     private final AIOFighterConfig config;
@@ -50,15 +51,16 @@ public class AIOFighterInfoOverlay extends OverlayPanel {
         blacklistButton.setFont(FontManager.getRunescapeBoldFont());
         blacklistButton.setOnClick(() -> {
             // Handle button click
-             AIOFighterPlugin.addBlacklistedSlayerNpcs(Rs2Slayer.slayerTaskMonsterTarget);
+            AIOFighterPlugin.addBlacklistedSlayerNpcs(Rs2Slayer.slayerTaskMonsterTarget);
             SlayerScript.reset();
         });
-
 
     }
 
     @Override
     public Dimension render(Graphics2D graphics) {
+        if (!config.showOverlay())
+            return null;
         try {
             panelComponent.setPreferredSize(new Dimension(250, 400));
             panelComponent.getChildren().add(TitleComponent.builder()
@@ -106,7 +108,7 @@ public class AIOFighterInfoOverlay extends OverlayPanel {
             panelComponent.getChildren().add(LineComponent.builder().build());
             panelComponent.getChildren().add(LineComponent.builder()
                     .left(Microbot.status)
-                    .right("Version:" +  AIOFighterPlugin.version)
+                    .right("Version:" + AIOFighterPlugin.version)
                     .build());
 
             // Add the button to the overlay panel

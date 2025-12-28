@@ -49,6 +49,7 @@ public class AttackNpcScript extends Script {
     public static volatile int cachedTargetNpcIndex = -1;
     private boolean messageShown = false;
     private int noNpcCount = 0;
+    private long lastCombatTime = 0;
 
     public static void skipNpc() {
         currentNpc = null;
@@ -71,7 +72,8 @@ public class AttackNpcScript extends Script {
                     return;
 
                 if (config.centerLocation().distanceTo(Rs2Player.getWorldLocation()) < config.attackRadius() &&
-                        !config.centerLocation().equals(new WorldPoint(0, 0, 0)) && AIOFighterPlugin.getState() != State.BANKING) {
+                        !config.centerLocation().equals(new WorldPoint(0, 0, 0))
+                        && AIOFighterPlugin.getState() != State.BANKING) {
                     if (ShortestPathPlugin.getPathfinder() != null)
                         Rs2Walker.setTarget(null);
                     AIOFighterPlugin.setState(State.IDLE);
@@ -86,19 +88,20 @@ public class AttackNpcScript extends Script {
                         boolean prevPause = Microbot.pauseAllScripts.getAndSet(true);
                         try {
                             if (head.reanimate()) {
-                                sleepUntil(() -> Rs2Npc.getNpcsForPlayer(Rs2EnsouledHead::isNpcReanimated).findAny().isPresent(), 15000);
+                                sleepUntil(() -> Rs2Npc.getNpcsForPlayer(Rs2EnsouledHead::isNpcReanimated).findAny()
+                                        .isPresent(), 15000);
                             }
                         } finally {
                             Microbot.pauseAllScripts.set(prevPause);
                         }
                     }
-                    Rs2NpcModel reanimated = Rs2Npc.getNpcsForPlayer(Rs2EnsouledHead::isNpcReanimated).findAny().orElse(null);
+                    Rs2NpcModel reanimated = Rs2Npc.getNpcsForPlayer(Rs2EnsouledHead::isNpcReanimated).findAny()
+                            .orElse(null);
                     if (reanimated != null) {
                         Rs2Npc.interact(reanimated, "Attack");
                         return;
                     }
                 }
-
 
                 attackableArea = new Rs2WorldArea(config.centerLocation().toWorldArea());
                 attackableArea = attackableArea.offset(config.attackRadius());
@@ -107,16 +110,21 @@ public class AttackNpcScript extends Script {
                         .collect(Collectors.toList());
                 filteredAttackableNpcs.set(
                         Rs2Npc.getAttackableNpcs(config.attackReachableNpcs())
-                                .filter(npc -> npc.getWorldLocation().distanceTo(config.centerLocation()) <= config.attackRadius())
-                                .filter(npc -> npc.getName() != null && !npcsToAttack.isEmpty() && npcsToAttack.stream().anyMatch(npc.getName()::equalsIgnoreCase))
-                                .sorted(Comparator.comparingInt((Rs2NpcModel npc) -> npc.getInteracting() == Microbot.getClient().getLocalPlayer() ? 0 : 1)
-                                        .thenComparingInt(npc -> Rs2Player.getRs2WorldPoint().distanceToPath(npc.getWorldLocation())))
-                                .collect(Collectors.toList())
-                );
+                                .filter(npc -> npc.getWorldLocation().distanceTo(config.centerLocation()) <= config
+                                        .attackRadius())
+                                .filter(npc -> npc.getName() != null && !npcsToAttack.isEmpty()
+                                        && npcsToAttack.stream().anyMatch(npc.getName()::equalsIgnoreCase))
+                                .sorted(Comparator
+                                        .comparingInt((Rs2NpcModel npc) -> npc.getInteracting() == Microbot.getClient()
+                                                .getLocalPlayer() ? 0 : 1)
+                                        .thenComparingInt(npc -> Rs2Player.getRs2WorldPoint()
+                                                .distanceToPath(npc.getWorldLocation())))
+                                .collect(Collectors.toList()));
                 final List<Rs2NpcModel> attackableNpcs = new ArrayList<>();
 
                 for (var attackableNpc : filteredAttackableNpcs.get()) {
-                    if (attackableNpc == null || attackableNpc.getName() == null) continue;
+                    if (attackableNpc == null || attackableNpc.getName() == null)
+                        continue;
                     for (var npcToAttack : npcsToAttack) {
                         if (npcToAttack.equalsIgnoreCase(attackableNpc.getName())) {
                             attackableNpcs.add(attackableNpc);
@@ -147,7 +155,8 @@ public class AttackNpcScript extends Script {
                     // Find the NPC by index using Rs2 API
                     Rs2NpcModel cachedNpcModel = Rs2Npc.getNpcByIndex(cachedTargetNpcIndex);
 
-                    if (cachedNpcModel != null && (cachedNpcModel.isDead() || (cachedNpcModel.getHealthRatio() == 0 && cachedNpcModel.getHealthScale() > 0))) {
+                    if (cachedNpcModel != null && (cachedNpcModel.isDead()
+                            || (cachedNpcModel.getHealthRatio() == 0 && cachedNpcModel.getHealthScale() > 0))) {
                         AIOFighterPlugin.setWaitingForLoot(true);
                         AIOFighterPlugin.setLastNpcKilledTime(System.currentTimeMillis());
                         Microbot.status = "Waiting for loot...";
@@ -185,12 +194,14 @@ public class AttackNpcScript extends Script {
 
                 if (Rs2AntibanSettings.antibanEnabled && Rs2AntibanSettings.actionCooldownChance > 0) {
                     if (Rs2AntibanSettings.actionCooldownActive) {
+                        lastCombatTime = System.currentTimeMillis();
                         AIOFighterPlugin.setState(State.COMBAT);
                         handleItemOnNpcToKill(config);
                         return;
                     }
                 } else {
                     if (Rs2Combat.inCombat()) {
+                        lastCombatTime = System.currentTimeMillis();
                         AIOFighterPlugin.setState(State.COMBAT);
                         handleItemOnNpcToKill(config);
                         return;
@@ -206,9 +217,10 @@ public class AttackNpcScript extends Script {
                         Rs2Camera.turnTo(npc);
 
                     Rs2Npc.interact(npc, "attack");
+                    lastCombatTime = System.currentTimeMillis();
                     Microbot.status = "Attacking " + npc.getName();
                     Rs2Antiban.actionCooldown();
-                    //sleepUntil(Rs2Player::isInteracting, 1000);
+                    // sleepUntil(Rs2Player::isInteracting, 1000);
 
                     if (config.togglePrayer()) {
                         if (!config.toggleQuickPray()) {
@@ -232,7 +244,6 @@ public class AttackNpcScript extends Script {
                         }
                     }
 
-
                 } else {
                     if (Rs2Player.getWorldLocation().isInArea(attackableArea)) {
                         Microbot.log(Level.INFO, "No attackable NPC found");
@@ -242,6 +253,31 @@ public class AttackNpcScript extends Script {
                             AIOFighterPlugin.addBlacklistedSlayerNpcs(Rs2Slayer.slayerTaskMonsterTarget);
                             noNpcCount = 0;
                             SlayerScript.reset();
+                        }
+
+                        // Return to center when idle for too long
+                        // Skip if we're in BANKING state to prevent tug-of-war with BankerScript
+                        if (config.returnToCenter() && AIOFighterPlugin.getState() != State.BANKING) {
+                            if (lastCombatTime > 0) {
+                                long idleTime = System.currentTimeMillis() - lastCombatTime;
+                                long idleDelayMs = config.returnToCenterDelay() * 1000L;
+                                if (idleTime >= idleDelayMs) {
+                                    WorldPoint center = config.centerLocation();
+                                    int distanceToCenter = Rs2Player.getWorldLocation().distanceTo(center);
+                                    if (!center.equals(new WorldPoint(0, 0, 0)) && distanceToCenter > 1) {
+                                        Microbot.log(Level.INFO,
+                                                "Idle for " + (idleTime / 1000)
+                                                        + "s, returning to center tile (distance: " + distanceToCenter
+                                                        + ")");
+                                        Rs2Walker.walkTo(center, 0);
+                                        AIOFighterPlugin.setState(State.WALKING);
+                                        lastCombatTime = 0; // Reset to prevent spam walking
+                                    }
+                                }
+                            } else {
+                                // If lastCombatTime is 0, set it now so timer can start
+                                lastCombatTime = System.currentTimeMillis();
+                            }
                         }
                     } else {
                         Rs2Walker.walkTo(config.centerLocation(), 0);
@@ -255,21 +291,24 @@ public class AttackNpcScript extends Script {
         }, 0, 600, TimeUnit.MILLISECONDS);
     }
 
-
     /**
      * item on npcs that need to kill like rockslug
      */
     private void handleItemOnNpcToKill(AIOFighterConfig config) {
         Rs2NpcModel npc = Rs2Npc.getNpcsForPlayer(ActorModel::isDead).findFirst().orElse(null);
         List<String> lizardVariants = new ArrayList<>(Arrays.asList("Lizard", "Desert Lizard", "Small Lizard"));
-        if (npc == null) return;
-        if (Microbot.getVarbitValue(SLAYER_AUTOKILL_DESERTLIZARDS) == 0 && lizardVariants.contains(npc.getName()) && npc.getHealthRatio() < 5) {
+        if (npc == null)
+            return;
+        if (Microbot.getVarbitValue(SLAYER_AUTOKILL_DESERTLIZARDS) == 0 && lizardVariants.contains(npc.getName())
+                && npc.getHealthRatio() < 5) {
             Rs2Inventory.useItemOnNpc(ItemID.SLAYER_ICY_WATER, npc);
             Rs2Player.waitForAnimation();
-        } else if (Microbot.getVarbitValue(SLAYER_AUTOKILL_ROCKSLUGS) == 0 && npc.getName().equalsIgnoreCase("rockslug") && npc.getHealthRatio() < 5) {
+        } else if (Microbot.getVarbitValue(SLAYER_AUTOKILL_ROCKSLUGS) == 0 && npc.getName().equalsIgnoreCase("rockslug")
+                && npc.getHealthRatio() < 5) {
             Rs2Inventory.useItemOnNpc(ItemID.SLAYER_BAG_OF_SALT, npc);
             Rs2Player.waitForAnimation();
-        } else if (Microbot.getVarbitValue(SLAYER_AUTOKILL_GARGOYLES) == 0 && npc.getName().equalsIgnoreCase("gargoyle") && npc.getHealthRatio() < 3) {
+        } else if (Microbot.getVarbitValue(SLAYER_AUTOKILL_GARGOYLES) == 0 && npc.getName().equalsIgnoreCase("gargoyle")
+                && npc.getHealthRatio() < 3) {
             Rs2Inventory.useItemOnNpc(ItemID.SLAYER_ROCK_HAMMER, npc);
             Rs2Player.waitForAnimation();
         }

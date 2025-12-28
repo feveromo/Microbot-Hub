@@ -38,7 +38,6 @@ public class BanksBankStanderScript extends Script {
     static Integer thirdItemId;
     static Integer fourthItemId;
 
-
     static Integer firstItemId;
     public static Integer secondItemId;
     private int sleepMin;
@@ -70,13 +69,16 @@ public class BanksBankStanderScript extends Script {
         thirdItemId = TryParseInt(config.thirdItemIdentifier());
         fourthItemId = TryParseInt(config.fourthItemIdentifier());
 
-        inventorySlots = calculateInteractOrder(new ArrayList<>(Rs2Inventory.items().collect(Collectors.toList())), config.interactOrder());
+        inventorySlots = calculateInteractOrder(new ArrayList<>(Rs2Inventory.items().collect(Collectors.toList())),
+                config.interactOrder());
 
         mainScheduledFuture = scheduledExecutorService.scheduleWithFixedDelay(() -> {
-            if (!Microbot.isLoggedIn()) return;
-            if (!super.run()) return;
+            if (!Microbot.isLoggedIn())
+                return;
+            if (!super.run())
+                return;
             try {
-                //start
+                // start
                 combineItems();
 
             } catch (Exception ex) {
@@ -130,7 +132,6 @@ public class BanksBankStanderScript extends Script {
         return firstOK && secondOK && thirdOK && fourthOK;
     }
 
-
     private String fetchItems() {
         if (config.pause()) {
             while (this.isRunning() && config.pause()) {
@@ -158,7 +159,6 @@ public class BanksBankStanderScript extends Script {
             depositUnwantedItems(secondItemId, config.secondItemQuantity());
             depositUnwantedItems(thirdItemId, config.thirdItemQuantity());
             depositUnwantedItems(fourthItemId, config.fourthItemQuantity());
-
 
             // Checking that we have enough items in the bank
             String missingItem = checkItemSums();
@@ -190,18 +190,20 @@ public class BanksBankStanderScript extends Script {
                 return false;
             }
         }
-        // this is to prevent unintended behaviour when the script is started with the bank open.
+        // this is to prevent unintended behaviour when the script is started with the
+        // bank open.
         if (Rs2Bank.isOpen()) {
             Rs2Bank.closeBank();
             sleepUntil(() -> !Rs2Bank.isOpen());
             sleep(calculateSleepDuration(1));
             return false;
         }
-        // We loop through executing this method "combineItems()", so we want to force return to do nothing while we wait for processing.
+        // We loop through executing this method "combineItems()", so we want to force
+        // return to do nothing while we wait for processing.
         if (config.waitForAnimation()) {
             if (Rs2Player.isAnimating() || (System.currentTimeMillis() - previousItemChange) < 3000) {
                 return false;
-            }// temp change from 2400 to 3000 as chiseling diamond takes longer time
+            } // temp change from 2400 to 3000 as chiseling diamond takes longer time
         }
 
         if (currentStatus != CurrentStatus.COMBINE_ITEMS) {
@@ -238,7 +240,8 @@ public class BanksBankStanderScript extends Script {
             }
         }
 
-        // When the config option is enabled, we interact with the popup when processing items.
+        // When the config option is enabled, we interact with the popup when processing
+        // items.
         if (config.needPromptEntry()) {
             sleep(calculateSleepDuration(1));
             isWaitingForPrompt = true;
@@ -249,12 +252,16 @@ public class BanksBankStanderScript extends Script {
             isWaitingForPrompt = false; // Ensure prompt flag is reset
             if (secondItemId != null) {
                 if (config.amuletOfChemistry()) {
-                    sleepUntil(() -> !Rs2Inventory.hasItem(secondItemId) || (!Rs2Equipment.isWearing(ItemID.AMULET_OF_CHEMISTRY) && !Rs2Equipment.isWearing(ItemID.AMULET_OF_CHEMISTRY_IMBUED_CHARGED)), 40000);
+                    sleepUntil(
+                            () -> !Rs2Inventory.hasItem(secondItemId)
+                                    || (!Rs2Equipment.isWearing(ItemID.AMULET_OF_CHEMISTRY)
+                                            && !Rs2Equipment.isWearing(ItemID.AMULET_OF_CHEMISTRY_IMBUED_CHARGED)),
+                            40000);
                     sleep(calculateSleepDuration(1));
                     checkForAmulet();
-//                    if(Rs2Bank.isOpen()) {
-//                        Rs2Bank.closeBank();
-//                    }
+                    // if(Rs2Bank.isOpen()) {
+                    // Rs2Bank.closeBank();
+                    // }
                 } else {
                     sleepUntil(() -> !Rs2Inventory.hasItem(secondItemId), 40000);
                 }
@@ -267,15 +274,48 @@ public class BanksBankStanderScript extends Script {
     }
 
     public void interactOrder(Integer itemId) {
-        if (itemId == null) return;
-        if (secondItemId == null && thirdItemId == null && fourthItemId == null && Rs2Inventory.hasItemAmount(itemId, config.firstItemQuantity())) {
-            //Process inventory quickly (cleaning herbs)
-            for (Rs2ItemModel itemToInteract : inventorySlots) {
-                if (itemToInteract != null) {
-                    Rs2Inventory.interact(itemToInteract, config.menu());
+        if (itemId == null)
+            return;
+        if (secondItemId == null && thirdItemId == null && fourthItemId == null
+                && Rs2Inventory.hasItemAmount(itemId, config.firstItemQuantity())) {
+            // Refresh inventorySlots to get current inventory state
+            inventorySlots = calculateInteractOrder(
+                    new ArrayList<>(Rs2Inventory.items().collect(Collectors.toList())),
+                    config.interactOrder());
+
+            // Check if we need to wait between each item interaction (e.g., scattering
+            // ashes)
+            if (config.waitBetweenEachItem()) {
+                // Process items one at a time, waiting for animation between each
+                for (Rs2ItemModel itemToInteract : inventorySlots) {
+                    // Check if script is still running before each item
+                    if (!isRunning())
+                        return;
+
+                    if (itemToInteract != null && Rs2Inventory.hasItem(itemToInteract.getId())) {
+                        Rs2Inventory.interact(itemToInteract, config.menu());
+                        // First, wait for the animation to START (with short timeout in case it doesn't
+                        // animate)
+                        sleepUntil(Rs2Player::isAnimating, 1200);
+                        // Then wait for the animation to FINISH
+                        sleepUntil(() -> !Rs2Player.isAnimating(), 5000);
+                        // Small delay after animation completes for natural timing
+                        sleep(Rs2Random.between(50, 150));
+                    }
                 }
+            } else {
+                // Process inventory quickly (cleaning herbs)
+                for (Rs2ItemModel itemToInteract : inventorySlots) {
+                    // Check if script is still running before each item
+                    if (!isRunning())
+                        return;
+
+                    if (itemToInteract != null) {
+                        Rs2Inventory.interact(itemToInteract, config.menu());
+                    }
+                }
+                sleepUntilTick(1);
             }
-            sleepUntilTick(1);
         } else {
             Rs2Inventory.interact(itemId, config.menu());
         }
@@ -285,7 +325,8 @@ public class BanksBankStanderScript extends Script {
         // Create a Random object
         Random random = new Random();
 
-        // Calculate the mean (average) of sleepMin and sleepMax, adjusted by sleepTarget
+        // Calculate the mean (average) of sleepMin and sleepMax, adjusted by
+        // sleepTarget
         double mean = (sleepMin + sleepMax + sleepTarget) / 3.0;
 
         // Calculate the standard deviation with added noise
@@ -295,9 +336,11 @@ public class BanksBankStanderScript extends Script {
         // Generate a random number following a normal distribution
         int sleepDuration;
         do {
-            // Generate a random number using nextGaussian method, scaled by standard deviation
+            // Generate a random number using nextGaussian method, scaled by standard
+            // deviation
             sleepDuration = (int) Math.round(mean + random.nextGaussian() * stdDeviation);
-        } while (sleepDuration < sleepMin || sleepDuration > sleepMax); // Ensure the duration is within the specified range
+        } while (sleepDuration < sleepMin || sleepDuration > sleepMax); // Ensure the duration is within the specified
+                                                                        // range
         if ((int) Math.round(sleepDuration * multiplier) < 60)
             sleepDuration += ((60 - sleepDuration) + Rs2Random.between(11, 44));
         return sleepDuration;
@@ -310,32 +353,44 @@ public class BanksBankStanderScript extends Script {
             sleep(200, 600);
         }
 
-        if (firstItemId != null && ((Rs2Bank.bankItems().stream().filter(item -> item.getId() == firstItemId).mapToInt(item -> item.getQuantity()).sum() + Rs2Inventory.count(firstItemId))) < config.firstItemQuantity()) {
+        if (firstItemId != null && ((Rs2Bank.bankItems().stream().filter(item -> item.getId() == firstItemId)
+                .mapToInt(item -> item.getQuantity()).sum() + Rs2Inventory.count(firstItemId))) < config
+                        .firstItemQuantity()) {
             return firstItemId.toString();
-        } else if (firstItemId == null && (Rs2Bank.count(config.firstItemIdentifier()) + Rs2Inventory.count(config.firstItemIdentifier())) < config.firstItemQuantity()) {
+        } else if (firstItemId == null && (Rs2Bank.count(config.firstItemIdentifier())
+                + Rs2Inventory.count(config.firstItemIdentifier())) < config.firstItemQuantity()) {
             return config.firstItemIdentifier();
         }
 
         if (config.secondItemQuantity() > 0 && !config.secondItemIdentifier().isEmpty()) {
-            if (secondItemId != null && ((Rs2Bank.bankItems().stream().filter(item -> item.getId() == secondItemId).mapToInt(item -> item.getQuantity()).sum() + Rs2Inventory.count(secondItemId))) < config.secondItemQuantity()) {
+            if (secondItemId != null && ((Rs2Bank.bankItems().stream().filter(item -> item.getId() == secondItemId)
+                    .mapToInt(item -> item.getQuantity()).sum() + Rs2Inventory.count(secondItemId))) < config
+                            .secondItemQuantity()) {
                 return secondItemId.toString();
-            } else if (secondItemId == null && (Rs2Bank.count(config.secondItemIdentifier()) + Rs2Inventory.count(config.secondItemIdentifier())) < config.secondItemQuantity()) {
+            } else if (secondItemId == null && (Rs2Bank.count(config.secondItemIdentifier())
+                    + Rs2Inventory.count(config.secondItemIdentifier())) < config.secondItemQuantity()) {
                 return config.secondItemIdentifier();
             }
         }
         if (config.thirdItemQuantity() > 0 && !config.thirdItemIdentifier().isEmpty()) {
 
-            if (thirdItemId != null && ((Rs2Bank.bankItems().stream().filter(item -> item.getId() == thirdItemId).mapToInt(item -> item.getQuantity()).sum() + Rs2Inventory.count(thirdItemId))) < config.thirdItemQuantity()) {
+            if (thirdItemId != null && ((Rs2Bank.bankItems().stream().filter(item -> item.getId() == thirdItemId)
+                    .mapToInt(item -> item.getQuantity()).sum() + Rs2Inventory.count(thirdItemId))) < config
+                            .thirdItemQuantity()) {
                 return thirdItemId.toString();
-            } else if (thirdItemId == null && (Rs2Bank.count(config.thirdItemIdentifier()) + Rs2Inventory.count(config.thirdItemIdentifier())) < config.thirdItemQuantity()) {
+            } else if (thirdItemId == null && (Rs2Bank.count(config.thirdItemIdentifier())
+                    + Rs2Inventory.count(config.thirdItemIdentifier())) < config.thirdItemQuantity()) {
                 return config.thirdItemIdentifier();
             }
         }
         if (config.fourthItemQuantity() > 0 && !config.fourthItemIdentifier().isEmpty()) {
 
-            if (fourthItemId != null && ((Rs2Bank.bankItems().stream().filter(item -> item.getId() == fourthItemId).mapToInt(item -> item.getQuantity()).sum() + Rs2Inventory.count(fourthItemId))) < config.fourthItemQuantity()) {
+            if (fourthItemId != null && ((Rs2Bank.bankItems().stream().filter(item -> item.getId() == fourthItemId)
+                    .mapToInt(item -> item.getQuantity()).sum() + Rs2Inventory.count(fourthItemId))) < config
+                            .fourthItemQuantity()) {
                 return fourthItemId.toString();
-            } else if (fourthItemId == null && (Rs2Bank.count(config.fourthItemIdentifier()) + Rs2Inventory.count(config.fourthItemIdentifier())) < config.fourthItemQuantity()) {
+            } else if (fourthItemId == null && (Rs2Bank.count(config.fourthItemIdentifier())
+                    + Rs2Inventory.count(config.fourthItemIdentifier())) < config.fourthItemQuantity()) {
                 return config.fourthItemIdentifier();
             }
         }
@@ -346,24 +401,29 @@ public class BanksBankStanderScript extends Script {
         if (amount > 0) {
             Integer id = TryParseInt(item);
 
-            // calculates the quantity we need to withdraw in case of any bugs, so we don't get stuck in a loop from any bugs.
+            // calculates the quantity we need to withdraw in case of any bugs, so we don't
+            // get stuck in a loop from any bugs.
             int missingQuantity = (id != null) ? ((Rs2Inventory.count(id) < amount)
                     ? amount - Rs2Inventory.count(id)
                     : 0)
                     : ((Rs2Inventory.count(item) < amount)
-                    ? amount - Rs2Inventory.count(item)
-                    : 0);
-            // just for efficiency, there's no point running everything else if we already have this item.
+                            ? amount - Rs2Inventory.count(item)
+                            : 0);
+            // just for efficiency, there's no point running everything else if we already
+            // have this item.
             if (missingQuantity > 0) {
-                // watching our time immediately before attempting to withdraw an item, so we can keep our sleep timer within an expected range when not our last item.
+                // watching our time immediately before attempting to withdraw an item, so we
+                // can keep our sleep timer within an expected range when not our last item.
                 timeValue = System.currentTimeMillis();
                 if (id != null) {
                     Rs2Bank.withdrawX(id, missingQuantity);
                 } else {
                     Rs2Bank.withdrawX(item, missingQuantity);
                 }
-                // code here is checking that we've withdrawn our last item from the bank before we wait for it to be in our inventory before we attempt to close the bank.
-                int lastItem = (config.fourthItemQuantity() > 0) ? 4 : (config.thirdItemQuantity() > 0) ? 3 : (config.secondItemQuantity() > 0) ? 2 : 1;
+                // code here is checking that we've withdrawn our last item from the bank before
+                // we wait for it to be in our inventory before we attempt to close the bank.
+                int lastItem = (config.fourthItemQuantity() > 0) ? 4
+                        : (config.thirdItemQuantity() > 0) ? 3 : (config.secondItemQuantity() > 0) ? 2 : 1;
                 if (lastItem == 4 && Objects.equals(item, config.fourthItemIdentifier()) ||
                         lastItem == 3 && Objects.equals(item, config.thirdItemIdentifier()) ||
                         lastItem == 2 && Objects.equals(item, config.secondItemIdentifier()) ||
@@ -387,7 +447,8 @@ public class BanksBankStanderScript extends Script {
     }
 
     private void depositUnwantedItems(Integer itemId, int quantityMax) {
-        if (itemId == null) return;
+        if (itemId == null)
+            return;
         if (config.depositAll() && Rs2Inventory.emptySlotCount() < 28) {
             timeValue = System.currentTimeMillis();
             Rs2Bank.depositAll();
@@ -398,14 +459,18 @@ public class BanksBankStanderScript extends Script {
             } else {
                 sleep(Rs2Random.between(14, 48));
             }
-            // we check that the inventory changes in case the player's bank is full so that we don't cause an unintentional loop.
-            // also since we're using the method "logout()", we'll also use "this.isRunning()" so people can avoid the logout by turning the plugin off.
+            // we check that the inventory changes in case the player's bank is full so that
+            // we don't cause an unintentional loop.
+            // also since we're using the method "logout()", we'll also use
+            // "this.isRunning()" so people can avoid the logout by turning the plugin off.
             if (this.isRunning() && Rs2Inventory.emptySlotCount() < 28) {
                 Microbot.showMessage("Bank is full, unable to deposit items.");
                 long start = System.currentTimeMillis();
-                while (this.isRunning() && ((System.currentTimeMillis() - start) < 120000) && Rs2Inventory.emptySlotCount() < 28) {
+                while (this.isRunning() && ((System.currentTimeMillis() - start) < 120000)
+                        && Rs2Inventory.emptySlotCount() < 28) {
                     sleepUntilTrue(() -> Rs2Inventory.emptySlotCount() == 28, 1800, 3600);
-                    if (Rs2Inventory.emptySlotCount() == 28) sleep(10000);
+                    if (Rs2Inventory.emptySlotCount() == 28)
+                        sleep(10000);
                 }
                 if (this.isRunning() && Rs2Inventory.emptySlotCount() < 28) {
                     sleep(calculateSleepDuration(1));
@@ -477,7 +542,8 @@ public class BanksBankStanderScript extends Script {
 
     // method to parse string to integer, returns null if parsing fails
     public static Integer TryParseInt(String text) {
-        if (text.isBlank()) return null;
+        if (text.isBlank())
+            return null;
         try {
             return Integer.parseInt(text);
         } catch (NumberFormatException ex) {
@@ -487,7 +553,8 @@ public class BanksBankStanderScript extends Script {
     }
 
     private void checkForAmulet() {
-        if (!Rs2Equipment.isWearing(ItemID.AMULET_OF_CHEMISTRY) && !Rs2Equipment.isWearing(ItemID.AMULET_OF_CHEMISTRY_IMBUED_CHARGED)) {
+        if (!Rs2Equipment.isWearing(ItemID.AMULET_OF_CHEMISTRY)
+                && !Rs2Equipment.isWearing(ItemID.AMULET_OF_CHEMISTRY_IMBUED_CHARGED)) {
             Rs2ItemModel currentAmulet = Rs2Equipment.get(EquipmentInventorySlot.AMULET);
             if (!Rs2Bank.isOpen()) {
                 Rs2Bank.openBank();
@@ -498,7 +565,8 @@ public class BanksBankStanderScript extends Script {
             } else if (Rs2Bank.isOpen() && Rs2Bank.hasItem(ItemID.AMULET_OF_CHEMISTRY)) {
                 Rs2Bank.withdrawAndEquip(ItemID.AMULET_OF_CHEMISTRY);
             } else {
-                Microbot.log("Missing Alchemist's Amulet and Amulet of Chemistry. (disable button if not required to wear an amulet)");
+                Microbot.log(
+                        "Missing Alchemist's Amulet and Amulet of Chemistry. (disable button if not required to wear an amulet)");
                 shutdown();
             }
             if (currentAmulet != null) {

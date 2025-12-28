@@ -7,18 +7,18 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum Activities {
     NONE(" "),
-//    DEFAULT("Default Script"),
+    // DEFAULT("Default Script"),
     GEM_CUTTING("Cutting Gems"),
     GLASSBLOWING("Glassblowing"),
     STAFF_MAKING("Staff Making"),
     FLAX_SPINNING("Flax Spinning"),
-    DRAGON_LEATHER("Dragon Leather");
+    DRAGON_LEATHER("Dragon Leather"),
+    LEATHER("Leather Crafting");
 
     private final String name;
 
     @Override
-    public String toString()
-    {
+    public String toString() {
         return name;
     }
 }

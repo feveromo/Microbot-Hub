@@ -65,11 +65,7 @@ configurations {
     configureEach {
         resolutionStrategy {
             eachDependency { details ->
-                if (details.target.group == 'com.microbot' && details.target.name == 'client') {
-                    details.artifactSelection {
-                        selectArtifact(DependencyArtifact.DEFAULT_TYPE, null, null)
-                    }
-                }
+                // Removed specific artifact selection for com.microbot:client as it may interfere with metadata parsing
             }
         }
     }
@@ -79,14 +75,20 @@ repositories {
     maven {
         url = project.ext.getNexusNightlyUrl()
     }
+    maven {
+        url = "https://repo.runelite.net/"
+        content {
+            excludeGroup "com.microbot"
+        }
+    }
     mavenCentral()
 }
 
 dependencies {
-    compileOnly 'com.microbot:client:+'
-    microbotRuntime 'com.microbot:client:+'
+    compileOnly 'com.microbot:client:2.0.60'
+    microbotRuntime 'com.microbot:client:2.0.60'
 
-    testImplementation 'com.microbot:client:+'
+    testImplementation 'com.microbot:client:2.0.60'
 }
 
 application {

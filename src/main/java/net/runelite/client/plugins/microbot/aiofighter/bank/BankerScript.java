@@ -1,6 +1,7 @@
 package net.runelite.client.plugins.microbot.aiofighter.bank;
 
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.event.Level;
 import net.runelite.api.GameObject;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.Skill;
@@ -35,11 +36,9 @@ import javax.inject.Inject;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
-
 @Slf4j
 public class BankerScript extends Script {
     AIOFighterConfig config;
-
 
     boolean initialized = false;
     public static boolean inventorySetupChanged = false;
@@ -56,10 +55,12 @@ public class BankerScript extends Script {
                 .orElse(null);
         mainScheduledFuture = scheduledExecutorService.scheduleWithFixedDelay(() -> {
             try {
-                if (!Microbot.isLoggedIn()) return;
-                if(!super.run()) return;
+                if (!Microbot.isLoggedIn())
+                    return;
+                if (!super.run())
+                    return;
                 if (config.bank() && needBanking() && !AIOFighterPlugin.needShopping) {
-                    if(handleBanking()){
+                    if (handleBanking()) {
                         Microbot.log("Banking handled successfully.");
                     }
                 } else if (!needBanking() &&
@@ -69,25 +70,24 @@ public class BankerScript extends Script {
                     boolean shouldWalk = false;
 
                     if (config.slayerMode()) {
-                        Map<Integer,Integer> missingIds = Rs2Walker.getMissingTransportItemIdsWithQuantities(
-                                Rs2Walker.getTransportsForDestination(config.centerLocation(),true));
+                        Map<Integer, Integer> missingIds = Rs2Walker.getMissingTransportItemIdsWithQuantities(
+                                Rs2Walker.getTransportsForDestination(config.centerLocation(), true));
                         if (!missingIds.isEmpty()) {
                             Microbot.log("Missing items: " + missingIds);
                             shouldWalk = handleTeleports(missingIds);
                             Microbot.log("Should walk(Slayer Mode): " + shouldWalk);
-                        }
-                        else shouldWalk = true;
-                    }
-                    else {
+                        } else
+                            shouldWalk = true;
+                    } else {
                         shouldWalk = true;
                         Microbot.log("Should walk: " + shouldWalk);
                     }
 
                     if (shouldWalk && Rs2Bank.closeBank()) {
-                         AIOFighterPlugin.setState(State.WALKING);
+                        AIOFighterPlugin.setState(State.WALKING);
                         Microbot.log("Walking to center location: " + config.centerLocation());
                         if (Rs2Walker.walkTo(config.centerLocation())) {
-                             AIOFighterPlugin.setState(State.IDLE);
+                            AIOFighterPlugin.setState(State.IDLE);
 
                         }
                     }
@@ -99,31 +99,34 @@ public class BankerScript extends Script {
         return true;
     }
 
-//    public boolean needsBanking() {
-//        return (isUpkeepItemDepleted(config) && config.bank()) || (Rs2Inventory.emptySlotCount() <= config.minFreeSlots() && config.bank()) || needSlayerItems() || inventorySetupChanged;
-//    }
+    // public boolean needsBanking() {
+    // return (isUpkeepItemDepleted(config) && config.bank()) ||
+    // (Rs2Inventory.emptySlotCount() <= config.minFreeSlots() && config.bank()) ||
+    // needSlayerItems() || inventorySetupChanged;
+    // }
     /**
-     * Returns true if the player needs to bank (e.g., missing potions, full inventory).
+     * Returns true if the player needs to bank (e.g., missing potions, full
+     * inventory).
      */
     public boolean needBanking() {
-        if(config.currentInventorySetup() == null){
-            if(config.defaultInventorySetup() != null) {
+        if (config.currentInventorySetup() == null) {
+            if (config.defaultInventorySetup() != null) {
                 AIOFighterPlugin.setCurrentSlayerInventorySetup(config.defaultInventorySetup());
             }
-        }        
-        if(!config.bank()){
+        }
+        if (!config.bank()) {
             return false;
         }
 
         // Don't bank if we can eat food for space instead
-        if (config.eatFoodForSpace() && 
-            Rs2Inventory.emptySlotCount() <= config.minFreeSlots() && 
-            !Rs2Inventory.getInventoryFood().isEmpty()) {
+        if (config.eatFoodForSpace() &&
+                Rs2Inventory.emptySlotCount() <= config.minFreeSlots() &&
+                !Rs2Inventory.getInventoryFood().isEmpty()) {
             // Food available to make space - let EatForSpaceScript handle it
             return false;
         }
 
-        if(bankingTriggered) {
+        if (bankingTriggered) {
             return true;
         }
 
@@ -135,16 +138,19 @@ public class BankerScript extends Script {
             return true;
         }
 
-        // (2) If there are too few empty slots, missing slayer items, or the inventory setup changed
-        if ((Rs2Inventory.emptySlotCount() <= config.minFreeSlots() && config.bank()) || needSlayerItems() || inventorySetupChanged) {
+        // (2) If there are too few empty slots, missing slayer items, or the inventory
+        // setup changed
+        if ((Rs2Inventory.emptySlotCount() <= config.minFreeSlots() && config.bank()) || needSlayerItems()
+                || inventorySetupChanged) {
             Microbot.log("Low free slots, missing slayer items, or inventory setup changed, triggering banking.");
             bankingTriggered = true;
             return true;
         }
-        
+
         // Double-check if inventory setup is still valid
-        if (config.currentInventorySetup() == null){
-            return false; // No current inventory setup, and also no default setup, so no need to bank because of the inventory setup
+        if (config.currentInventorySetup() == null) {
+            return false; // No current inventory setup, and also no default setup, so no need to bank
+                          // because of the inventory setup
         }
 
         String setupName = null;
@@ -162,7 +168,7 @@ public class BankerScript extends Script {
             Microbot.log("Invalid inventory setup name, skipping banking.");
             return false;
         }
-        
+
         Rs2InventorySetup inventorySetup = new Rs2InventorySetup(setupName, mainScheduledFuture);
 
         // (3) If food is required but not available
@@ -171,7 +177,8 @@ public class BankerScript extends Script {
             return true;
         }
 
-        // (4) For each potion type, check if the setup requires it and if the player is missing it
+        // (4) For each potion type, check if the setup requires it and if the player is
+        // missing it
         if (needsPotion(inventorySetup, Rs2Potion.getPrayerPotionsVariants())) {
             Microbot.log("Prayer potion required but not available, triggering banking.");
             return true;
@@ -208,15 +215,13 @@ public class BankerScript extends Script {
         return false;
     }
 
-
     /**
-     * Checks if the given setup requires any variant of a specific potion but the player does not have it.
+     * Checks if the given setup requires any variant of a specific potion but the
+     * player does not have it.
      */
-    private static boolean needsPotion(Rs2InventorySetup setup, List<String> potionVariants)
-    {
+    private static boolean needsPotion(Rs2InventorySetup setup, List<String> potionVariants) {
         // If the setup doesn't contain any of these variants, no need to bank for them
-        if (!setupHasPotion(setup, potionVariants))
-        {
+        if (!setupHasPotion(setup, potionVariants)) {
             return false;
         }
         // The setup does require it; if we don't have it, we need to bank
@@ -224,22 +229,19 @@ public class BankerScript extends Script {
     }
 
     /**
-     * Checks if the given setup has any item matching any of the given potion variants.
+     * Checks if the given setup has any item matching any of the given potion
+     * variants.
      */
-    private static boolean setupHasPotion(Rs2InventorySetup setup, List<String> potionVariants)
-    {
-        return setup.getInventoryItems().stream().anyMatch(item ->
-        {
-            if (item.getName() == null)
-            {
+    private static boolean setupHasPotion(Rs2InventorySetup setup, List<String> potionVariants) {
+        return setup.getInventoryItems().stream().anyMatch(item -> {
+            if (item.getName() == null) {
                 return false;
             }
             // Strip off any "(x doses)" part
             String itemBaseName = item.getName().split("\\(")[0].trim().toLowerCase(Locale.ENGLISH);
 
             // Check if that base name matches any potion variant
-            return potionVariants.stream().anyMatch(variant ->
-            {
+            return potionVariants.stream().anyMatch(variant -> {
                 String variantLower = variant.toLowerCase(Locale.ENGLISH);
                 return variantLower.contains(itemBaseName);
             });
@@ -247,11 +249,9 @@ public class BankerScript extends Script {
     }
 
     // check if we need food
-    private static boolean needsFood(Rs2InventorySetup setup)
-    {
+    private static boolean needsFood(Rs2InventorySetup setup) {
         // if setup doesn't have any food, no need to bank for it
-        if (!setupHasFood(setup))
-        {
+        if (!setupHasFood(setup)) {
             return false;
         }
         // setup does require food; if we don't have it, we need to bank
@@ -259,18 +259,14 @@ public class BankerScript extends Script {
     }
 
     // check if setup has any food
-    private static boolean setupHasFood(Rs2InventorySetup setup)
-    {
-        return setup.getInventoryItems().stream().anyMatch(item ->
-        {
-            if (item.getName() == null)
-            {
+    private static boolean setupHasFood(Rs2InventorySetup setup) {
+        return setup.getInventoryItems().stream().anyMatch(item -> {
+            if (item.getName() == null) {
                 return false;
             }
             // get id of the item
             int itemId = item.getId();
-            return
-                    Rs2Food.getIds().contains(itemId);
+            return Rs2Food.getIds().contains(itemId);
         });
     }
 
@@ -286,7 +282,6 @@ public class BankerScript extends Script {
         return result;
     }
 
-
     public boolean hasProtectiveSlayerEquipment() {
         String needed = Rs2Slayer.getSlayerTaskProtectiveEquipment();
 
@@ -299,7 +294,8 @@ public class BankerScript extends Script {
             return true;
         }
 
-        // check if the needed item is "Rock hammer" or "Rock thrownhammer", if so, check if the player has it in inventory
+        // check if the needed item is "Rock hammer" or "Rock thrownhammer", if so,
+        // check if the player has it in inventory
         if (needed.equals("Rock hammer") || needed.equals("Rock thrownhammer")) {
             if (Rs2Inventory.contains(needed)) {
                 return true;
@@ -329,10 +325,10 @@ public class BankerScript extends Script {
         }
     }
 
-
     public boolean needDesertProtection() {
         boolean result = config.slayerLocation().contains("Desert")
-                && !Rs2Inventory.contains(ItemID.WATER_SKIN4, ItemID.WATER_SKIN3, ItemID.WATER_SKIN2, ItemID.WATER_SKIN1);
+                && !Rs2Inventory.contains(ItemID.WATER_SKIN4, ItemID.WATER_SKIN3, ItemID.WATER_SKIN2,
+                        ItemID.WATER_SKIN1);
         if (result) {
             Microbot.log("needDesertProtection(): In a Desert slayer location but missing watertskins.");
         }
@@ -356,16 +352,13 @@ public class BankerScript extends Script {
         return result;
     }
 
-
-
-
     public void withdrawUpkeepItems(AIOFighterConfig config) {
         // Always empty special bags when banking
         Rs2Bank.depositLootingBag();
         Rs2Bank.emptyGemBag();
         Rs2Bank.emptyHerbSack();
         Rs2Bank.emptySeedBox();
-        
+
         if (config.useInventorySetup() || config.slayerMode()) {
             String setupName = null;
             if (config.slayerMode() && config.currentInventorySetup() != null) {
@@ -373,12 +366,12 @@ public class BankerScript extends Script {
             } else if (!config.slayerMode() && config.inventorySetup() != null) {
                 setupName = config.inventorySetup().getName();
             }
-            
+
             if (setupName == null) {
                 Microbot.log("Cannot load inventory setup - null setup name");
                 return;
             }
-            
+
             Rs2InventorySetup inventorySetup = new Rs2InventorySetup(setupName, mainScheduledFuture);
             if (!Rs2Bank.isOpen()) {
                 Microbot.log("Bank didn't open, returning.");
@@ -389,41 +382,63 @@ public class BankerScript extends Script {
             } else {
                 Microbot.log("Loading equipment for unknown setup (null)");
             }
-            inventorySetup.loadEquipment();
-            inventorySetup.loadInventory();
+            boolean equipmentLoaded = inventorySetup.loadEquipment();
+            boolean inventoryLoaded = inventorySetup.loadInventory();
 
-            bankingTriggered = false;
+            if (equipmentLoaded && inventoryLoaded) {
+                bankingTriggered = false;
+                Microbot.log("Successfully loaded inventory setup: " + setupName);
+            } else {
+                Microbot.log("Failed to load inventory setup - equipment: " + equipmentLoaded + ", inventory: "
+                        + inventoryLoaded + ". Attempting fallback withdrawal...");
 
+                // Fallback: manually withdraw inventory items if loadInventory failed
+                if (!inventoryLoaded) {
+                    boolean fallbackSuccess = manuallyWithdrawInventoryItems(inventorySetup);
+                    if (fallbackSuccess) {
+                        Microbot.log("Fallback withdrawal completed successfully.");
+                    } else {
+                        Microbot.log("Fallback withdrawal also failed. Some items may be missing.");
+                    }
+                }
+                bankingTriggered = false;
+            }
 
-
-            if(needSlayerItems()){
+            if (needSlayerItems()) {
                 if (config.slayerHasTaskWeakness()) {
                     if (Rs2Bank.hasBankItem(config.slayerTaskWeaknessItem())) {
                         Rs2ItemModel item = Rs2Bank.getBankItem(config.slayerTaskWeaknessItem());
-                        if(Rs2Bank.hasBankItem(config.slayerTaskWeaknessItem(), item.isStackable() ? Rs2Slayer.getSlayerTaskSize() : 1,false)) {
-                            Rs2Bank.withdrawX(true, config.slayerTaskWeaknessItem(), item.isStackable() ? Rs2Slayer.getSlayerTaskSize() : 1);
-                        }
-                        else {
-                            ItemComposition itemComp = Microbot.getRs2ItemManager().getItemComposition(Rs2Slayer.getSlayerTaskWeakness());
+                        if (Rs2Bank.hasBankItem(config.slayerTaskWeaknessItem(),
+                                item.isStackable() ? Rs2Slayer.getSlayerTaskSize() : 1, false)) {
+                            Rs2Bank.withdrawX(true, config.slayerTaskWeaknessItem(),
+                                    item.isStackable() ? Rs2Slayer.getSlayerTaskSize() : 1);
+                        } else {
+                            ItemComposition itemComp = Microbot.getRs2ItemManager()
+                                    .getItemComposition(Rs2Slayer.getSlayerTaskWeakness());
                             boolean isGeItem = itemComp.getId() == ItemID.SHANTAY_PASS;
-                            ShopScript.shopItems.add(new ShopItem(config.slayerTaskWeaknessItem(), itemComp.isStackable() ? Rs2Slayer.getSlayerTaskSize() : 1, itemComp.getId() , isGeItem ? ShopType.GRAND_EXCHANGE : ShopType.SLAYER_SHOP));
-                             AIOFighterPlugin.needShopping = true;
+                            ShopScript.shopItems.add(new ShopItem(config.slayerTaskWeaknessItem(),
+                                    itemComp.isStackable() ? Rs2Slayer.getSlayerTaskSize() : 1, itemComp.getId(),
+                                    isGeItem ? ShopType.GRAND_EXCHANGE : ShopType.SLAYER_SHOP));
+                            AIOFighterPlugin.needShopping = true;
                         }
 
-                    }
-                    else {
-                        ItemComposition item = Microbot.getRs2ItemManager().getItemComposition(Rs2Slayer.getSlayerTaskWeakness());
+                    } else {
+                        ItemComposition item = Microbot.getRs2ItemManager()
+                                .getItemComposition(Rs2Slayer.getSlayerTaskWeakness());
                         boolean isGeItem = item.getId() == ItemID.SHANTAY_PASS;
-                        ShopScript.shopItems.add(new ShopItem(config.slayerTaskWeaknessItem(), item.isStackable() ? Rs2Slayer.getSlayerTaskSize() : 1, item.getId() , isGeItem ? ShopType.GRAND_EXCHANGE : ShopType.SLAYER_SHOP));
-                         AIOFighterPlugin.needShopping = true;
+                        ShopScript.shopItems.add(new ShopItem(config.slayerTaskWeaknessItem(),
+                                item.isStackable() ? Rs2Slayer.getSlayerTaskSize() : 1, item.getId(),
+                                isGeItem ? ShopType.GRAND_EXCHANGE : ShopType.SLAYER_SHOP));
+                        AIOFighterPlugin.needShopping = true;
                     }
                 }
-                if ( needDesertProtection()) {
-                    if(Rs2Bank.hasBankItem(ItemID.WATER_SKIN4, Rs2Inventory.emptySlotCount()/2))
-                        Rs2Bank.withdrawX(true, ItemID.WATER_SKIN4, Rs2Inventory.emptySlotCount()/2);
+                if (needDesertProtection()) {
+                    if (Rs2Bank.hasBankItem(ItemID.WATER_SKIN4, Rs2Inventory.emptySlotCount() / 2))
+                        Rs2Bank.withdrawX(true, ItemID.WATER_SKIN4, Rs2Inventory.emptySlotCount() / 2);
                     else {
-                        ShopScript.shopItems.add(new ShopItem("Waterskin(4)", Rs2Inventory.emptySlotCount()/2, ItemID.WATER_SKIN4 , ShopType.GRAND_EXCHANGE));
-                         AIOFighterPlugin.needShopping = true;
+                        ShopScript.shopItems.add(new ShopItem("Waterskin(4)", Rs2Inventory.emptySlotCount() / 2,
+                                ItemID.WATER_SKIN4, ShopType.GRAND_EXCHANGE));
+                        AIOFighterPlugin.needShopping = true;
 
                     }
                 }
@@ -432,72 +447,219 @@ public class BankerScript extends Script {
                         Rs2Bank.withdrawAndEquip(Rs2Slayer.getSlayerTaskProtectiveEquipment());
                         sleep(3000);
                         inventorySetupsPlugin.addInventorySetup("cache");
-                        InventorySetup inventorySetup1 = MInventorySetupsPlugin.getInventorySetups().stream().filter(Objects::nonNull).filter(x -> x.getName().equalsIgnoreCase("cache")).findFirst().orElse(null);
-                         AIOFighterPlugin.setCurrentSlayerInventorySetup(inventorySetup1);
+                        InventorySetup inventorySetup1 = MInventorySetupsPlugin.getInventorySetups().stream()
+                                .filter(Objects::nonNull).filter(x -> x.getName().equalsIgnoreCase("cache")).findFirst()
+                                .orElse(null);
+                        AIOFighterPlugin.setCurrentSlayerInventorySetup(inventorySetup1);
                     } else {
-                        ShopScript.shopItems.add(new ShopItem(Rs2Slayer.getSlayerTaskProtectiveEquipment(), 1, Microbot.getRs2ItemManager().getItemId(Rs2Slayer.getSlayerTaskProtectiveEquipment()), ShopType.SLAYER_SHOP));
-                         AIOFighterPlugin.needShopping = true;
+                        ShopScript.shopItems.add(new ShopItem(Rs2Slayer.getSlayerTaskProtectiveEquipment(), 1,
+                                Microbot.getRs2ItemManager().getItemId(Rs2Slayer.getSlayerTaskProtectiveEquipment()),
+                                ShopType.SLAYER_SHOP));
+                        AIOFighterPlugin.needShopping = true;
 
                     }
 
-
                 }
-//                if( AIOFighterBetaPlugin.needShopping)
-//                    return;
+                // if( AIOFighterBetaPlugin.needShopping)
+                // return;
             }
             inventorySetupChanged = false;
         }
 
     }
 
-//    public boolean depositAllExcept(AIOFighterConfig config) {
-//        List<Integer> ids = Arrays.stream(ItemToKeep.values())
-//                .filter(item -> item.isEnabled(config))
-//                .flatMap(item -> item.getIds().stream())
-//                .collect(Collectors.toList());
-//        Rs2Bank.depositAllExcept(ids.toArray(new Integer[0]));
-//        return Rs2Bank.isOpen();
-//    }
+    /**
+     * Fallback method to manually withdraw inventory items when loadInventory()
+     * fails.
+     * Uses name-based matching which is more reliable for stackable items like
+     * runes.
+     * For stackable items, withdraws all available instead of exact quantity.
+     *
+     * @param setup The inventory setup to withdraw items from
+     * @return true if at least some items were successfully withdrawn
+     */
+    private boolean manuallyWithdrawInventoryItems(Rs2InventorySetup setup) {
+        if (!Rs2Bank.isOpen()) {
+            Microbot.log("Bank is not open for fallback withdrawal.");
+            return false;
+        }
 
-//    public boolean isUpkeepItemDepleted(AIOFighterConfig config) {
-//        return Arrays.stream(ItemToKeep.values())
-//                .filter(item -> item != ItemToKeep.TELEPORT && item.isEnabled(config))
-//                .anyMatch(item -> item.getIds().stream().mapToInt(Rs2Inventory::count).sum() == 0);
-//    }
-//
-//    public boolean goToBank() {
-//        return Rs2Walker.walkTo(Rs2Bank.getNearestBank().getWorldPoint(), 8);
-//    }
+        var inventoryItems = setup.getInventoryItems();
+        if (inventoryItems == null || inventoryItems.isEmpty()) {
+            Microbot.log("No inventory items found in setup for fallback withdrawal.");
+            return false;
+        }
+
+        int successCount = 0;
+        int totalItems = 0;
+
+        for (var item : inventoryItems) {
+            if (item == null || item.getId() == -1) {
+                continue;
+            }
+
+            String itemName = item.getName();
+            int quantity = item.getQuantity();
+
+            if (itemName == null || itemName.isEmpty() || quantity <= 0) {
+                continue;
+            }
+
+            totalItems++;
+
+            // Check if item is already in inventory
+            if (Rs2Inventory.contains(itemName)) {
+                Microbot.log("Fallback: Item '" + itemName + "' already in inventory, skipping.");
+                successCount++;
+                continue;
+            }
+
+            // Check if bank has the item
+            if (!Rs2Bank.hasBankItem(itemName)) {
+                Microbot.log("Fallback: Item '" + itemName + "' not found in bank.");
+                continue;
+            }
+
+            try {
+                // For stackable items (like runes), withdraw all available
+                // This ensures we get the runes even if quantity doesn't match exactly
+                if (isStackableItem(itemName)) {
+                    Microbot.log("Fallback: Withdrawing all '" + itemName + "' (stackable item)");
+                    Rs2Bank.withdrawAll(itemName);
+                } else {
+                    // For non-stackable items, withdraw the exact quantity
+                    Microbot.log("Fallback: Withdrawing " + quantity + "x '" + itemName + "'");
+                    Rs2Bank.withdrawX(true, itemName, quantity);
+                }
+                Rs2Inventory.waitForInventoryChanges(1200);
+                successCount++;
+            } catch (Exception e) {
+                Microbot.log("Fallback: Error withdrawing '" + itemName + "': " + e.getMessage());
+            }
+        }
+
+        Microbot.log("Fallback withdrawal complete: " + successCount + "/" + totalItems + " items processed.");
+        return successCount > 0;
+    }
+
+    /**
+     * Checks if an item is stackable based on its name.
+     * Includes runes, coins, arrows, bolts, and other common stackable items.
+     *
+     * @param itemName The name of the item to check
+     * @return true if the item is considered stackable
+     */
+    private boolean isStackableItem(String itemName) {
+        if (itemName == null) {
+            return false;
+        }
+        String lowerName = itemName.toLowerCase();
+
+        // Common stackable items
+        return lowerName.contains("rune") ||
+                lowerName.equals("coins") ||
+                lowerName.contains("arrow") ||
+                lowerName.contains("bolt") ||
+                lowerName.contains("dart") ||
+                lowerName.contains("knife") ||
+                lowerName.contains("javelin") ||
+                lowerName.contains("chinchompa") ||
+                lowerName.contains("scale") ||
+                lowerName.contains("essence") ||
+                lowerName.contains("ore") ||
+                lowerName.contains("bar") ||
+                lowerName.contains("seed") ||
+                lowerName.contains("herb") && !lowerName.contains("grimy");
+    }
+
+    // public boolean depositAllExcept(AIOFighterConfig config) {
+    // List<Integer> ids = Arrays.stream(ItemToKeep.values())
+    // .filter(item -> item.isEnabled(config))
+    // .flatMap(item -> item.getIds().stream())
+    // .collect(Collectors.toList());
+    // Rs2Bank.depositAllExcept(ids.toArray(new Integer[0]));
+    // return Rs2Bank.isOpen();
+    // }
+
+    // public boolean isUpkeepItemDepleted(AIOFighterConfig config) {
+    // return Arrays.stream(ItemToKeep.values())
+    // .filter(item -> item != ItemToKeep.TELEPORT && item.isEnabled(config))
+    // .anyMatch(item -> item.getIds().stream().mapToInt(Rs2Inventory::count).sum()
+    // == 0);
+    // }
+    //
+    // public boolean goToBank() {
+    // return Rs2Walker.walkTo(Rs2Bank.getNearestBank().getWorldPoint(), 8);
+    // }
 
     public boolean handleBanking() {
-         AIOFighterPlugin.setState(State.BANKING);
-        //bankingTriggered = true;
+        AIOFighterPlugin.setState(State.BANKING);
+        Microbot.log("Starting banking process...", Level.INFO);
         Rs2Prayer.disableAllPrayers();
         if (Rs2Bank.walkToBankAndUseBank()) {
+            Microbot.log("Bank opened, withdrawing upkeep items...", Level.INFO);
             withdrawUpkeepItems(config);
-            
+
             // Use Pool of Restoration at Ferox if configured
             if (config.usePoolAtFerox() && Rs2Bank.getNearestBank() == BankLocation.FEROX_ENCLAVE) {
                 usePoolIfNeeded();
             }
+
+            boolean stillNeedsBanking = needBanking();
+            Microbot.log("Banking handled. Still needs banking? " + stillNeedsBanking, Level.INFO);
+
+            // Always reset bankingTriggered after a banking attempt to prevent looping back
+            // to bank
+            bankingTriggered = false;
+
+            if (stillNeedsBanking) {
+                Microbot.log(
+                        "Banking failed to satisfy all requirements, but forced reset to allow return to fight spot.",
+                        Level.WARN);
+            }
+
+            // Close bank and return to center location
+            if (Rs2Bank.isOpen()) {
+                Rs2Bank.closeBank();
+                sleepUntil(() -> !Rs2Bank.isOpen(), 3000);
+            }
+
+            // Walk back to center location if it's set
+            if (!config.centerLocation().equals(new WorldPoint(0, 0, 0))) {
+                AIOFighterPlugin.setState(State.WALKING);
+                Microbot.log("Walking back to center location: " + config.centerLocation());
+                if (Rs2Walker.walkTo(config.centerLocation())) {
+                    Microbot.log("Arrived at center location.");
+                }
+                // Wait for player to stop moving
+                sleepUntil(() -> !Rs2Player.isMoving(), 3000);
+            }
+
+            // Set state to IDLE to allow combat scripts to resume
+            AIOFighterPlugin.setState(State.IDLE);
+            Microbot.log("Banking complete, state set to IDLE. Combat script should resume.");
+
+            return true; // Return true to indicate we handled banking attempt
         }
-        return !needBanking();
+        Microbot.log("Failed to open bank via walkToBankAndUseBank", Level.WARN);
+        return false;
     }
-    
+
     private void usePoolIfNeeded() {
         // Check if we need restoration (HP < 100%, Prayer < 100%, or Run < 90%)
         boolean needsPool = Rs2Player.getHealthPercentage() < 100 ||
-                           Rs2Player.getBoostedSkillLevel(Skill.PRAYER) < Rs2Player.getRealSkillLevel(Skill.PRAYER) ||
-                           Rs2Player.getRunEnergy() < 90;
-        
-        if (!needsPool) return;
-        
+                Rs2Player.getBoostedSkillLevel(Skill.PRAYER) < Rs2Player.getRealSkillLevel(Skill.PRAYER) ||
+                Rs2Player.getRunEnergy() < 90;
+
+        if (!needsPool)
+            return;
+
         // Close bank first if open
         if (Rs2Bank.isOpen()) {
             Rs2Bank.closeBank();
             sleepUntil(() -> !Rs2Bank.isOpen(), 2000);
         }
-        
+
         // Find and use the pool
         GameObject pool = Rs2GameObject.get("Pool of Refreshment", true);
         if (pool != null) {
@@ -509,8 +671,9 @@ public class BankerScript extends Script {
             }
         }
     }
-    public boolean handleTeleports(Map<Integer,Integer> ids_quantity) {
-         AIOFighterPlugin.setState(State.BANKING);
+
+    public boolean handleTeleports(Map<Integer, Integer> ids_quantity) {
+        AIOFighterPlugin.setState(State.BANKING);
         Rs2Prayer.disableAllPrayers();
         if (Rs2Bank.walkToBankAndUseBank()) {
             for (Map.Entry<Integer, Integer> entry : ids_quantity.entrySet()) {

@@ -14,18 +14,9 @@ import net.runelite.client.ui.overlay.OverlayManager;
 import javax.inject.Inject;
 import java.awt.*;
 
-@PluginDescriptor(
-        name = PluginDescriptor.Mocrosoft + "Crafting",
-        description = "Microbot crafting plugin",
-        tags = {"skilling", "microbot", "crafting"},
-        authors = { "Mocrosoft" },
-        version = CraftingPlugin.version,
-        minClientVersion = "2.0.7",
-        cardUrl = "https://chsami.github.io/Microbot-Hub/CraftingPlugin/assets/card.png",
-        iconUrl = "https://chsami.github.io/Microbot-Hub/CraftingPlugin/assets/icon.png",
-        enabledByDefault = PluginConstants.DEFAULT_ENABLED,
-        isExternal = PluginConstants.IS_EXTERNAL
-)
+@PluginDescriptor(name = PluginDescriptor.Mocrosoft + "Crafting", description = "Microbot crafting plugin", tags = {
+        "skilling", "microbot", "crafting" }, authors = {
+                "Mocrosoft" }, version = CraftingPlugin.version, minClientVersion = "2.0.7", cardUrl = "https://chsami.github.io/Microbot-Hub/CraftingPlugin/assets/card.png", iconUrl = "https://chsami.github.io/Microbot-Hub/CraftingPlugin/assets/icon.png", enabledByDefault = PluginConstants.DEFAULT_ENABLED, isExternal = PluginConstants.IS_EXTERNAL)
 @Slf4j
 public class CraftingPlugin extends Plugin {
 
@@ -37,6 +28,7 @@ public class CraftingPlugin extends Plugin {
     private final StaffScript staffScript = new StaffScript();
     private final FlaxSpinScript flaxSpinScript = new FlaxSpinScript();
     private final DragonLeatherScript dragonLeatherScript = new DragonLeatherScript();
+    private final LeatherScript leatherScript = new LeatherScript();
 
     public ICraftingScript currentScript = null;
 
@@ -54,12 +46,12 @@ public class CraftingPlugin extends Plugin {
 
     @Override
     protected void startUp() throws AWTException {
-		Microbot.pauseAllScripts.compareAndSet(true, false);
+        Microbot.pauseAllScripts.compareAndSet(true, false);
         if (overlayManager != null) {
             overlayManager.add(craftingOverlay);
         }
 
-//        if (config.activityType() == Activities.DEFAULT) {
+        // if (config.activityType() == Activities.DEFAULT) {
 
         if (config.activityType() == Activities.GEM_CUTTING) {
             currentScript = gemsScript;
@@ -76,6 +68,9 @@ public class CraftingPlugin extends Plugin {
         } else if (config.activityType() == Activities.DRAGON_LEATHER) {
             currentScript = dragonLeatherScript;
             dragonLeatherScript.run(config);
+        } else if (config.activityType() == Activities.LEATHER) {
+            currentScript = leatherScript;
+            leatherScript.run(config);
         }
     }
 
@@ -86,6 +81,7 @@ public class CraftingPlugin extends Plugin {
         defaultScript.shutdown();
         flaxSpinScript.shutdown();
         dragonLeatherScript.shutdown();
+        leatherScript.shutdown();
         overlayManager.remove(craftingOverlay);
     }
 }
